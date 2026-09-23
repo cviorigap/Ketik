@@ -1,4 +1,4 @@
-import bgUrl from "../assets/bg.jpg";
+import bgUrl from "../assets/bg-raw.jpg";
 import { sfx } from "./audio";
 import { DIFFICULTIES, type Difficulty, type DifficultyConfig } from "./config";
 import { getWordPool } from "./words";
