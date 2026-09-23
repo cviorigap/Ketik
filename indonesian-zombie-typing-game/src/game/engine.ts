@@ -22,7 +22,6 @@ export interface GameStats {
 export interface EngineEvents {
   onGameOver: (s: GameStats) => void;
   onGrenades: (n: number) => void;
-  onHint: (ch: string | null) => void;
 }
 
 interface Zombie {
@@ -159,6 +158,7 @@ const MAX_GRENADES = 3;
 const KILLS_PER_GRENADE = 15;
 const MAX_P = 900;
 const VP_Y = 0.6; // titik hilang pada gambar latar
+const CD_STEP = 0.45; // durasi tiap angka hitung mundur
 
 const P_SPARK = 0;
 const P_GOO = 1;
@@ -318,7 +318,7 @@ export class Engine {
   private overSent = false;
   private demoSpawnT = 0;
   private botT = 0;
-  private lastHint: string | null = "?";
+  private countdown = 0;
 
   // efek
   private parts: Particle[] = [];
@@ -464,7 +464,6 @@ export class Engine {
     this.wave = 0;
     this.nextWave();
     this.ev.onGrenades(this.grenades);
-    this.emitHint();
     sfx.start();
   }
 
@@ -479,7 +478,6 @@ export class Engine {
     this.wave = 4;
     this.demoSpawnT = 0.2;
     sfx.muted = true;
-    this.emitHint();
   }
 
   setPaused(p: boolean) {
@@ -488,9 +486,24 @@ export class Engine {
     if (!p) this.last = 0;
   }
 
+  /** Lanjutkan permainan; di HP diberi hitung mundur agar keyboard sempat muncul. */
+  resume(withCountdown = false) {
+    this.setPaused(false);
+    if (this.mode === "play" && withCountdown) {
+      this.countdown = 3 * CD_STEP - 0.0001;
+      this.muzzle = 0;
+      this.recoil = 0;
+      sfx.tick(false);
+    }
+  }
+
+  isGameOver(): boolean {
+    return this.mode === "over";
+  }
+
   /** Mengembalikan true bila huruf benar. */
   type(ch: string): boolean {
-    if (this.mode !== "play" || this.paused) return false;
+    if (this.mode !== "play" || this.paused || this.countdown > 0) return false;
     return this.processChar(ch.toUpperCase());
   }
 
@@ -499,11 +512,10 @@ export class Engine {
     this.target.prog = 0;
     this.target = null;
     sfx.release();
-    this.emitHint();
   }
 
   throwGrenade(): boolean {
-    if (this.mode !== "play" || this.paused || this.grenades <= 0 || this.grenade) return false;
+    if (this.mode !== "play" || this.paused || this.countdown > 0 || this.grenades <= 0 || this.grenade) return false;
     let n = 0;
     let sx = 0;
     let sy = 0;
@@ -648,6 +660,15 @@ export class Engine {
     this.dmgFlash = Math.max(0, this.dmgFlash - realDt * 1.5);
     this.typoFlash = Math.max(0, this.typoFlash - realDt);
     this.bannerT += realDt;
+    if (this.countdown > 0) {
+      // zombi membeku, tapi efek (partikel, teks) tetap berjalan & memudar
+      const before = Math.ceil(this.countdown / CD_STEP);
+      this.countdown = Math.max(0, this.countdown - realDt);
+      const now = Math.ceil(this.countdown / CD_STEP);
+      if (now !== before) sfx.tick(now === 0);
+      this.updateFx(realDt);
+      return;
+    }
     let dt = realDt;
     if (this.hitstop > 0) {
       this.hitstop -= realDt;
@@ -902,7 +923,7 @@ export class Engine {
     this.danger = 0;
     this.tutorial = 0;
     this.paused = false;
-    this.lastHint = "?";
+    this.countdown = 0;
   }
 
   private nextWave() {
@@ -1137,7 +1158,6 @@ export class Engine {
       this.checkTier();
       this.shoot(t);
       if (t.prog >= word.length) this.completeWord(t);
-      this.emitHint();
       return true;
     }
     this.typo(t);
@@ -1277,7 +1297,6 @@ export class Engine {
       z.z = Math.max(0, z.z - 0.08);
       this.gore(z, 0.5);
       sfx.bossHit();
-      this.emitHint();
     } else this.killZombie(z, cause);
   }
 
@@ -1293,7 +1312,6 @@ export class Engine {
 
     if (z.kind === "medkit") {
       this.collectMedkit(z, cy);
-      this.emitHint();
       return;
     }
     this.gore(z, 1);
@@ -1332,7 +1350,6 @@ export class Engine {
       if (this.tutorial > 1) this.tutorial = 1;
     }
     if (z.kind === "bomber") this.blasts.push({ x: z.sx, y: cy, wx: z.x, wz: z.z, t: 0.08 });
-    this.emitHint();
   }
 
   private collectMedkit(z: Zombie, cy: number) {
@@ -1364,7 +1381,6 @@ export class Engine {
       for (let i = 0; i < 4; i++) {
         this.spawnP(P_SMOKE, z.sx + rand(-20, 20) * this.ui, z.sy - rand(10, 60) * this.ui, rand(-20, 20), -rand(20, 50), rand(0.5, 0.9), rand(40, 70) * this.ui, "", 0, 1.5, 1e9, this.smokeSprite);
       }
-      this.emitHint();
       return;
     }
     const dmg = z.kind === "boss" ? 2 : 1;
@@ -1382,7 +1398,6 @@ export class Engine {
     sfx.hurt();
     this.vibrate([70, 40, 110]);
     if (this.lives <= 0) this.gameOver();
-    this.emitHint();
   }
 
   private gameOver() {
@@ -1394,7 +1409,6 @@ export class Engine {
     this.grenade = null;
     sfx.gameOver();
     this.showBanner("TAMAT!", "Barikade jebol…", "#ff3b3b");
-    this.emitHint();
   }
 
   private detonate(b: Blast) {
@@ -1456,14 +1470,6 @@ export class Engine {
     }
   }
 
-  private emitHint() {
-    const t = this.target;
-    const h = this.mode === "play" && t && t.alive ? (t.words[t.wi][t.prog] ?? null) : null;
-    if (h !== this.lastHint) {
-      this.lastHint = h;
-      this.ev.onHint(h);
-    }
-  }
 
   private stats(): GameStats {
     const minutes = Math.max(this.playTime, 1) / 60;
@@ -1809,6 +1815,7 @@ export class Engine {
     if (this.mode !== "demo") this.drawHud();
     this.drawBanner();
     if (this.mode === "play" && this.tutorial > 0) this.drawTutorial();
+    if (this.countdown > 0) this.drawCountdown();
   }
 
   private drawZombie(z: Zombie) {
@@ -2081,13 +2088,14 @@ export class Engine {
     const margin = Math.min(this.W * 0.3, text.length * size * this.ui * 0.3 + 10);
     const px = clamp(x, margin, this.W - margin);
     let py = Math.max(y, 80 * this.ui);
-    const hgt = size * this.ui * 1.15;
     for (let iter = 0; iter < 5; iter++) {
       let hit = false;
       for (const t of this.texts) {
         if (t.life > 0.45) continue;
-        if (Math.abs(t.x - px) < Math.max(margin, 90 * this.ui) && Math.abs(t.y - py) < hgt) {
-          py = t.y + hgt;
+        const halfW = (t.text.length * t.size + text.length * size) * this.ui * 0.3 + 6;
+        const halfH = (t.size + size) * this.ui * 0.55;
+        if (Math.abs(t.x - px) < halfW && Math.abs(t.y - py) < halfH) {
+          py = t.y + halfH + 1;
           hit = true;
         }
       }
@@ -2273,12 +2281,46 @@ export class Engine {
     ctx.restore();
   }
 
+  private drawCountdown() {
+    const ctx = this.ctx;
+    const W = this.W;
+    const H = this.H;
+    const n = Math.ceil(this.countdown / CD_STEP);
+    const k = 1 - (this.countdown - (n - 1) * CD_STEP) / CD_STEP;
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.fillRect(0, 0, W, H);
+    const s = easeOutBack(Math.min(1, k / 0.4));
+    const fs = Math.round(Math.min(W, H) * 0.36);
+    const cy = H * 0.46;
+    ctx.save();
+    ctx.globalAlpha = k > 0.8 ? Math.max(0, 1 - (k - 0.8) / 0.2) : 1;
+    ctx.translate(W / 2, cy);
+    ctx.scale(s, s);
+    ctx.font = `${fs}px ${HORROR}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = Math.max(6, fs * 0.08);
+    ctx.strokeStyle = "rgba(0,0,0,0.85)";
+    ctx.strokeText(String(n), 0, 0);
+    ctx.fillStyle = "#b4ff5a";
+    ctx.fillText(String(n), 0, 0);
+    ctx.restore();
+    ctx.font = `800 ${Math.round(14 * this.ui)}px ${UI}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(240,245,235,0.92)";
+    ctx.fillText("SIAP-SIAP…", W / 2, cy + fs * 0.55);
+  }
+
   private drawTutorial() {
     const ctx = this.ctx;
     const ui = this.ui;
     const a = Math.min(1, this.tutorial / 0.6) * (0.8 + 0.2 * Math.sin(this.rt * 5));
-    const text = this.isTouch ? "KETIK DI KEYBOARD HP UNTUK MENEMBAK!" : "KETIK KATA DI ATAS ZOMBI UNTUK MENEMBAK!";
-    const sub = "Huruf pertama mengunci target · salah ketik memutus combo";
+    const text = this.isTouch ? "KETIK KATA DI ATAS ZOMBI!" : "KETIK KATA DI ATAS ZOMBI UNTUK MENEMBAK!";
+    const sub = this.isTouch
+      ? "Pakai keyboard HP-mu · huruf pertama mengunci target"
+      : "Huruf pertama mengunci target · salah ketik memutus combo";
     const y = this.barTop - 44 * ui;
     ctx.save();
     ctx.globalAlpha = a;

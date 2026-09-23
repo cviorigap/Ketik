@@ -22,7 +22,7 @@ export function HighScoreTable({ entries, highlight = -1 }: Props) {
           <th className="py-2 pl-3 text-left w-9">#</th>
           <th className="py-2 text-left">NAMA</th>
           <th className="py-2 text-right">SKOR</th>
-          <th className="py-2 text-right pl-2">GEL.</th>
+          <th className="py-2 text-right pl-2 pr-3 sm:pr-0">GEL.</th>
           <th className="py-2 pr-3 text-right pl-2 hidden sm:table-cell">WPM</th>
         </tr>
       </thead>
@@ -54,7 +54,7 @@ export function HighScoreTable({ entries, highlight = -1 }: Props) {
               </td>
               <td className="py-1.5 max-w-[9rem] truncate font-bold">{e.name}</td>
               <td className="py-1.5 text-right font-mono font-extrabold tabular-nums">{e.score.toLocaleString("id-ID")}</td>
-              <td className="py-1.5 pl-2 text-right font-mono tabular-nums text-stone-300">{e.wave}</td>
+              <td className="py-1.5 pl-2 pr-3 text-right font-mono tabular-nums text-stone-300 sm:pr-0">{e.wave}</td>
               <td className="py-1.5 pl-2 pr-3 text-right font-mono tabular-nums text-stone-300 hidden sm:table-cell">{e.wpm}</td>
             </tr>
           );

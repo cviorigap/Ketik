@@ -14,7 +14,16 @@ export interface RoundResult extends GameStats {
 
 /* ---------------- JEDA ---------------- */
 
+export type PauseReason = "manual" | "keyboard" | "hidden";
+
+const REASON_TEXT: Record<PauseReason, string> = {
+  manual: "Zombi menunggu… tarik napas dulu.",
+  keyboard: "Keyboard tertutup — permainan dijeda otomatis.",
+  hidden: "Permainan dijeda selagi kamu pergi.",
+};
+
 interface PauseProps {
+  reason: PauseReason;
   onResume: () => void;
   onRestart: () => void;
   onMenu: () => void;
@@ -23,17 +32,19 @@ interface PauseProps {
   isTouch: boolean;
 }
 
-export function PauseScreen({ onResume, onRestart, onMenu, sound, onToggleSound, isTouch }: PauseProps) {
+export function PauseScreen({ reason, onResume, onRestart, onMenu, sound, onToggleSound, isTouch }: PauseProps) {
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 p-4 animate-fade-in">
+    <div className="fixed inset-0 z-40 overflow-y-auto bg-black/70 p-4 animate-fade-in scroll-thin">
+      <div className="flex min-h-full items-center justify-center">
       <div className="panel w-full max-w-sm p-6 text-center animate-pop-in">
         <h2 className="font-horror text-6xl leading-none text-[#b4ff5a] title-glow">JEDA</h2>
-        <p className="mt-2 text-sm text-stone-400">Zombi menunggu… tarik napas dulu.</p>
+        <p className={`mt-2 text-sm ${reason === "keyboard" ? "text-amber-200" : "text-stone-400"}`}>{REASON_TEXT[reason]}</p>
         <div className="mt-6 flex flex-col gap-2.5">
-          <button className="btn-start" onClick={onResume} autoFocus>
+          <button className="btn-start" onClick={onResume} autoFocus={!isTouch}>
             LANJUT
             {!isTouch && <kbd className="key">ESC</kbd>}
           </button>
+          {isTouch && <p className="-mt-0.5 text-[11px] text-stone-400">Keyboard HP akan muncul lagi, lalu hitung mundur 3-2-1</p>}
           <button className="btn-ghost" onClick={onRestart}>
             ULANGI DARI AWAL
           </button>
@@ -44,6 +55,7 @@ export function PauseScreen({ onResume, onRestart, onMenu, sound, onToggleSound,
             <SoundIcon on={sound} className="h-4 w-4" /> SUARA: {sound ? "NYALA" : "MATI"}
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -98,7 +110,7 @@ export function GameOverScreen({ result, board, isTouch, onRestart, onMenu }: Ov
 
   return (
     <div
-      className="absolute inset-0 z-40 overflow-y-auto p-3 animate-fade-in scroll-thin"
+      className="fixed inset-0 z-40 overflow-y-auto p-3 animate-fade-in scroll-thin"
       style={{ background: "radial-gradient(ellipse at 50% 30%, rgba(60,0,0,0.55), rgba(0,0,0,0.88) 70%)" }}
     >
       <div className="flex min-h-full items-center justify-center py-4">

@@ -50,13 +50,6 @@ export const GrenadeIcon = ({ className = "w-6 h-6" }: P) => (
   </svg>
 );
 
-export const BackspaceIcon = ({ className = "w-6 h-6" }: P) => (
-  <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" aria-hidden>
-    <path d="M9 5h11a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 20 19H9l-6.5-7L9 5z" />
-    <path d="M12.5 9.5l5 5M17.5 9.5l-5 5" />
-  </svg>
-);
-
 export const SkullIcon = ({ className = "w-5 h-5" }: P) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
     <path d="M12 2.5c-4.7 0-8.3 3.4-8.3 7.9 0 2.7 1.3 4.6 3.1 5.8V19a1.5 1.5 0 0 0 1.5 1.5h7.4a1.5 1.5 0 0 0 1.5-1.5v-2.8c1.8-1.2 3.1-3.1 3.1-5.8 0-4.5-3.6-7.9-8.3-7.9zM8.6 13.6a2.1 2.1 0 1 1 0-4.2 2.1 2.1 0 0 1 0 4.2zm6.8 0a2.1 2.1 0 1 1 0-4.2 2.1 2.1 0 0 1 0 4.2zM12 14.2l1.3 2.3h-2.6l1.3-2.3z" />

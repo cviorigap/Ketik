@@ -325,6 +325,14 @@ class SoundEngine {
     this.noise(t + 0.08, 1.1, "lowpass", 1300, 90, 0.5, 0.25, 0.01);
   }
 
+  tick(go = false) {
+    if (!this.ready()) return;
+    const t = this.ctx!.currentTime;
+    const f = go ? 1320 : 880;
+    this.tone(t, go ? 0.2 : 0.09, "square", f, f, 0.07);
+    if (go) this.tone(t, 0.3, "sine", 200, 55, 0.45);
+  }
+
   click() {
     if (!this.ready()) return;
     const t = this.ctx!.currentTime;
