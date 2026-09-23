@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { CompositionEvent, FormEvent, KeyboardEvent as RKeyboardEvent, PointerEvent as RPointerEvent } from "react";
+import { flushSync } from "react-dom";
 import { Engine, type GameStats } from "./game/engine";
 import { sfx } from "./game/audio";
 import { DIFFICULTY_ORDER, type Difficulty } from "./game/config";
 import { addScore, loadBoard, loadSettings, saveSettings, type Board } from "./game/storage";
 import { StartScreen } from "./components/StartScreen";
 import { GameOverScreen, PauseScreen, type RoundResult } from "./components/Overlays";
-import { TouchKeyboard, type TouchKeyboardHandle } from "./components/TouchKeyboard";
+import { MobileInputBar } from "./components/MobileInputBar";
 import { GrenadeIcon, PauseIcon } from "./components/Icons";
 
 type Screen = "menu" | "playing" | "paused" | "gameover";
 
 const detectTouch = () =>
   typeof window !== "undefined" &&
-  (window.matchMedia?.("(pointer: coarse)").matches || (navigator.maxTouchPoints > 0 && !window.matchMedia?.("(pointer: fine)").matches));
+  (window.matchMedia?.("(pointer: coarse)").matches ||
+    (navigator.maxTouchPoints > 0 && !window.matchMedia?.("(pointer: fine)").matches));
+
+const isLetter = (ch: string) => ch.length === 1 && /[a-z]/i.test(ch);
 
 export default function App() {
   const initial = useRef(loadSettings()).current;
@@ -23,19 +28,24 @@ export default function App() {
   const [board, setBoard] = useState<Board>(() => loadBoard());
   const [result, setResult] = useState<RoundResult | null>(null);
   const [grenades, setGrenades] = useState(1);
+  const [hint, setHint] = useState<string | null>(null);
   const [isTouch, setIsTouch] = useState<boolean>(() => !!detectTouch());
+  const [kbFocused, setKbFocused] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Engine | null>(null);
-  const kbRef = useRef<TouchKeyboardHandle>(null);
+  const playInputRef = useRef<HTMLInputElement>(null);
   const screenRef = useRef(screen);
   const diffRef = useRef(difficulty);
   const nameRef = useRef(name);
+  const isTouchRef = useRef(isTouch);
   const overAt = useRef(0);
   screenRef.current = screen;
   diffRef.current = difficulty;
   nameRef.current = name;
+  isTouchRef.current = isTouch;
 
   /* ---------- game over ---------- */
   const handleGameOver = (s: GameStats) => {
@@ -56,6 +66,7 @@ export default function App() {
     setBoard(loadBoard());
     setResult({ ...s, rank, isBest: s.score > 0 && s.score > before, prevBest: before, name: playerName });
     overAt.current = performance.now();
+    playInputRef.current?.blur();
     setScreen("gameover");
   };
   const gameOverRef = useRef(handleGameOver);
@@ -69,7 +80,7 @@ export default function App() {
     const engine = new Engine(canvas, {
       onGameOver: (s) => gameOverRef.current(s),
       onGrenades: (n) => setGrenades(n),
-      onHint: (ch) => kbRef.current?.setHint(ch),
+      onHint: (ch) => setHint(ch),
     });
     engine.isTouch = !!detectTouch();
     engineRef.current = engine;
@@ -102,32 +113,80 @@ export default function App() {
     sfx.setEnabled(sound);
   }, [sound]);
 
-  /* ---------- aksi ---------- */
-  const start = useCallback((d?: Difficulty) => {
-    const e = engineRef.current;
-    if (!e) return;
-    sfx.init();
-    const diff = d ?? diffRef.current;
-    setDifficulty(diff);
-    e.startGame(diff);
-    setGrenades(1);
-    setScreen("playing");
+  /* ---------- visual viewport: area main mengecil saat keyboard HP terbuka ---------- */
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const apply = () => {
+      window.scrollTo(0, 0);
+      const vv = window.visualViewport;
+      if (!vv) {
+        root.style.top = "0px";
+        root.style.left = "0px";
+        root.style.width = "100%";
+        root.style.height = "100%";
+        return;
+      }
+      root.style.top = `${Math.round(vv.offsetTop)}px`;
+      root.style.left = `${Math.round(vv.offsetLeft)}px`;
+      root.style.width = `${Math.round(vv.width)}px`;
+      root.style.height = `${Math.round(vv.height)}px`;
+    };
+    apply();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", apply);
+    vv?.addEventListener("scroll", apply);
+    window.addEventListener("resize", apply);
+    return () => {
+      vv?.removeEventListener("resize", apply);
+      vv?.removeEventListener("scroll", apply);
+      window.removeEventListener("resize", apply);
+    };
   }, []);
+
+  const focusPlayInput = useCallback(() => {
+    const el = playInputRef.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+  }, []);
+
+  /* ---------- aksi ---------- */
+  const start = useCallback(
+    (d?: Difficulty) => {
+      const e = engineRef.current;
+      if (!e) return;
+      sfx.init();
+      const touch = !!detectTouch() || isTouchRef.current;
+      const diff = d ?? diffRef.current;
+      setDifficulty(diff);
+      e.startGame(diff);
+      setGrenades(1);
+      flushSync(() => {
+        if (touch) setIsTouch(true);
+        setScreen("playing");
+      });
+      if (touch) focusPlayInput();
+    },
+    [focusPlayInput],
+  );
 
   const pause = useCallback(() => {
     if (screenRef.current !== "playing") return;
+    playInputRef.current?.blur();
     engineRef.current?.setPaused(true);
     setScreen("paused");
   }, []);
 
   const resume = useCallback(() => {
     engineRef.current?.setPaused(false);
-    setScreen("playing");
-  }, []);
+    flushSync(() => setScreen("playing"));
+    if (isTouchRef.current) focusPlayInput();
+  }, [focusPlayInput]);
 
   const toMenu = useCallback(() => {
     const e = engineRef.current;
     if (!e) return;
+    playInputRef.current?.blur();
     e.setPaused(false);
     e.startDemo();
     setScreen("menu");
@@ -138,7 +197,63 @@ export default function App() {
     setSound((s) => !s);
   }, []);
 
-  /* ---------- keyboard fisik ---------- */
+  const drainLetters = (raw: string) => {
+    const eng = engineRef.current;
+    if (!eng || screenRef.current !== "playing") return;
+    for (const ch of raw) {
+      if (isLetter(ch)) eng.type(ch);
+    }
+  };
+
+  const clearPlayInput = () => {
+    const el = playInputRef.current;
+    if (el && el.value) el.value = "";
+  };
+
+  const onPlayInput = (e: FormEvent<HTMLInputElement>) => {
+    const v = e.currentTarget.value;
+    if (!v) return;
+    e.currentTarget.value = "";
+    drainLetters(v);
+  };
+
+  const onPlayBeforeInput = (e: FormEvent<HTMLInputElement>) => {
+    if (screenRef.current !== "playing") return;
+    const ne = e.nativeEvent;
+    if (typeof InputEvent === "undefined" || !(ne instanceof InputEvent)) return;
+    // Huruf ditangani di onInput agar tidak dobel. Hapus = lepas target.
+    if (ne.inputType.startsWith("delete")) {
+      e.preventDefault();
+      engineRef.current?.cancelTarget();
+      clearPlayInput();
+    }
+  };
+
+  const onPlayCompositionEnd = (e: CompositionEvent<HTMLInputElement>) => {
+    const v = e.currentTarget.value;
+    e.currentTarget.value = "";
+    if (v) drainLetters(v);
+  };
+
+  const onPlayKeyDown = (e: RKeyboardEvent<HTMLInputElement>) => {
+    if (screenRef.current !== "playing") return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      engineRef.current?.throwGrenade();
+      clearPlayInput();
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      engineRef.current?.cancelTarget();
+      clearPlayInput();
+    } else if (e.key === " ") {
+      e.preventDefault();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      pause();
+    }
+  };
+
+  /* ---------- keyboard fisik (desktop) + pintasan ---------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -150,6 +265,7 @@ export default function App() {
       sfx.init();
 
       if (s === "playing") {
+        if (tgt === playInputRef.current) return;
         if (e.key === "Escape") {
           e.preventDefault();
           pause();
@@ -159,7 +275,7 @@ export default function App() {
         } else if (e.key === "Backspace") {
           e.preventDefault();
           eng.cancelTarget();
-        } else if (e.key.length === 1 && /^[a-z]$/i.test(e.key)) {
+        } else if (e.key.length === 1 && isLetter(e.key)) {
           e.preventDefault();
           if (!e.repeat) eng.type(e.key);
         } else if (e.key === " ") {
@@ -207,7 +323,12 @@ export default function App() {
     const onVis = () => {
       if (document.hidden) pause();
     };
-    const onBlur = () => pause();
+    const onBlur = () => {
+      // Di HP, buka keyboard bawaan sering memicu window.blur — jangan jeda.
+      if (isTouchRef.current) return;
+      if (document.activeElement === playInputRef.current) return;
+      pause();
+    };
     const unlock = () => sfx.init();
     const onTouch = () => setIsTouch(true);
     document.addEventListener("visibilitychange", onVis);
@@ -224,17 +345,26 @@ export default function App() {
     };
   }, [pause]);
 
-  const onTouchKey = useCallback((ch: string) => engineRef.current?.type(ch) ?? false, []);
-  const onTouchBack = useCallback(() => engineRef.current?.cancelTarget(), []);
   const onGrenade = useCallback(() => {
     engineRef.current?.throwGrenade();
   }, []);
 
-  const showKb = isTouch && screen !== "menu";
+  const onStagePointerDown = (e: RPointerEvent<HTMLDivElement>) => {
+    if (screenRef.current !== "playing" || !isTouchRef.current) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    focusPlayInput();
+  };
+
+  const showMobileBar = isTouch && screen === "playing";
 
   return (
-    <div className="fixed inset-0 flex select-none flex-col bg-[#040807]">
-      <div ref={stageRef} className="relative min-h-0 flex-1 overflow-hidden" style={{ touchAction: "none" }}>
+    <div ref={rootRef} className="fixed flex select-none flex-col bg-[#040807]" style={{ top: 0, left: 0, width: "100%", height: "100%" }}>
+      <div
+        ref={stageRef}
+        className="relative min-h-0 flex-1 overflow-hidden"
+        style={{ touchAction: "none" }}
+        onPointerDown={onStagePointerDown}
+      >
         <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
         {screen === "playing" && (
           <>
@@ -256,7 +386,21 @@ export default function App() {
         )}
       </div>
 
-      {showKb && <TouchKeyboard ref={kbRef} grenades={grenades} onKey={onTouchKey} onBackspace={onTouchBack} onGrenade={onGrenade} />}
+      {showMobileBar && (
+        <MobileInputBar
+          ref={playInputRef}
+          grenades={grenades}
+          hint={hint}
+          focused={kbFocused}
+          onGrenade={onGrenade}
+          onInput={onPlayInput}
+          onBeforeInput={onPlayBeforeInput}
+          onKeyDown={onPlayKeyDown}
+          onCompositionEnd={onPlayCompositionEnd}
+          onFocus={() => setKbFocused(true)}
+          onBlur={() => setKbFocused(false)}
+        />
+      )}
 
       {screen === "menu" && (
         <StartScreen

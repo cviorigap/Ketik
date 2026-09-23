@@ -1,4 +1,4 @@
-import bgUrl from "../assets/bg-raw.jpg";
+import bgUrl from "../assets/bg.jpg";
 import { sfx } from "./audio";
 import { DIFFICULTIES, type Difficulty, type DifficultyConfig } from "./config";
 import { getWordPool } from "./words";
@@ -2277,7 +2277,7 @@ export class Engine {
     const ctx = this.ctx;
     const ui = this.ui;
     const a = Math.min(1, this.tutorial / 0.6) * (0.8 + 0.2 * Math.sin(this.rt * 5));
-    const text = this.isTouch ? "KETUK HURUF UNTUK MENEMBAK!" : "KETIK KATA DI ATAS ZOMBI UNTUK MENEMBAK!";
+    const text = this.isTouch ? "KETIK DI KEYBOARD HP UNTUK MENEMBAK!" : "KETIK KATA DI ATAS ZOMBI UNTUK MENEMBAK!";
     const sub = "Huruf pertama mengunci target · salah ketik memutus combo";
     const y = this.barTop - 44 * ui;
     ctx.save();

@@ -20,7 +20,7 @@ interface Props {
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 animate-fade-in" onClick={onClose}>
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 p-3 animate-fade-in" onClick={onClose}>
       <div className="panel w-full max-w-lg max-h-[88dvh] flex flex-col animate-pop-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
           <h3 className="font-horror text-3xl text-[#b4ff5a] title-glow tracking-wide">{title}</h3>
@@ -59,7 +59,7 @@ export function StartScreen(p: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-30 overflow-y-auto overscroll-contain scroll-thin"
+      className="absolute inset-0 z-30 overflow-y-auto overscroll-contain scroll-thin"
       style={{
         background:
           "radial-gradient(ellipse at 50% 38%, rgba(2,6,5,0.5) 0%, rgba(2,6,5,0.78) 55%, rgba(2,5,4,0.95) 100%)",
@@ -179,7 +179,7 @@ export function StartScreen(p: Props) {
 
         <p className="text-center text-[11px] text-stone-500">
           {p.isTouch
-            ? "Keyboard di layar muncul saat bermain · Getar & suara aktif"
+            ? "Keyboard HP-mu terbuka saat bermain · Getar & suara aktif"
             : "ENTER mulai · 1 2 3 pilih kesulitan · ESC jeda saat bermain"}
         </p>
       </div>
@@ -215,7 +215,7 @@ export function StartScreen(p: Props) {
               <>Selesaikan katanya. Setiap huruf benar = <b className="text-amber-300">satu tembakan</b> yang mendorong zombi mundur.</>,
               <>Salah ketik memutus combo. Combo <b>10 / 25 / 50 / 100</b> melipatkan skor hingga <b className="text-red-400">x5</b>.</>,
               <><b className="text-amber-300">Granat</b> (ENTER / tombol granat) meledakkan semua zombi di layar. Dapat +1 tiap 15 zombi.</>,
-              <><b>BACKSPACE</b> melepas target · <b>ESC</b> menjeda permainan.</>,
+              <>Di HP, pakai <b className="text-lime-300">keyboard bawaan</b> HP-mu. Ketuk bilah hijau jika keyboard tertutup. BACKSPACE melepas target.</>,
               <>Zombi yang mencapai barikade merenggut nyawamu. Habis 5 nyawa = tamat!</>,
             ].map((t, i) => (
               <li key={i} className="flex gap-3">
