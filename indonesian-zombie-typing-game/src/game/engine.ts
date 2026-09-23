@@ -1,7 +1,7 @@
 import bgUrl from "../assets/bg-raw.jpg";
 import { sfx } from "./audio";
 import { DIFFICULTIES, type Difficulty, type DifficultyConfig } from "./config";
-import { getWordPool } from "./words";
+import { getThemePool, getWordPool } from "./words";
 import * as S from "./sprites";
 
 export type ZKind = "walker" | "runner" | "pocong" | "bomber" | "tank" | "boss" | "medkit";
@@ -270,6 +270,8 @@ export class Engine {
   private cfg: DifficultyConfig = DIFFICULTIES.mudah;
   private pool: string[] = [];
   private poolShort: string[] = [];
+  private theme: string[] = [];
+  private themeShort: string[] = [];
   private recent: string[] = [];
   private recentSet = new Set<string>();
   private zombies: Zombie[] = [];
@@ -459,6 +461,8 @@ export class Engine {
     this.cfg = DIFFICULTIES[diff];
     this.pool = getWordPool(diff);
     this.poolShort = diff === "sulit" ? getWordPool(diff, 6) : this.pool;
+    this.theme = getThemePool(diff);
+    this.themeShort = diff === "sulit" ? getThemePool(diff, 6) : this.theme;
     sfx.muted = false;
     this.tutorial = 14;
     this.wave = 0;
@@ -474,6 +478,8 @@ export class Engine {
     this.cfg = DIFFICULTIES.sedang;
     this.pool = getWordPool("sedang");
     this.poolShort = this.pool;
+    this.theme = getThemePool("sedang");
+    this.themeShort = this.theme;
     this.travel = 9;
     this.wave = 4;
     this.demoSpawnT = 0.2;
@@ -1044,7 +1050,12 @@ export class Engine {
       used.add(z.words[z.wi][z.prog] ?? "");
       for (const w of z.words) onScreen.add(w);
     }
-    const pool = kind === "runner" ? this.poolShort : this.pool;
+    // sesekali ambil kata bertema zombi agar suasana tetap terasa
+    const short = kind === "runner";
+    const tpool = short ? this.themeShort : this.theme;
+    // hanya beri "bumbu" bila daftar tema memang kecil dibanding kumpulan utama
+    const useTheme = tpool.length > 8 && tpool.length * 3 < this.pool.length && Math.random() < 0.18;
+    const pool = useTheme ? tpool : short ? this.poolShort : this.pool;
     const res: string[] = [];
     for (let i = 0; i < n; i++) {
       let pick = "";
